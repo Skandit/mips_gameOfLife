@@ -67,7 +67,7 @@ GameLoop:
 
 
 # ============================================
-#       ENGINE BY ENIS
+#       logic, rules by ENIS
 # ============================================
 ClearGrids:
     la   $t0, currentGrid   
@@ -363,9 +363,9 @@ EndApplyLWSS:
     jr   $ra
 
 
-
-//bymustafa
-
+# ============================================
+#       menu, in game controls by MUSTAFA
+# ============================================
 
 MenuInput:
     addi $sp, $sp, -4          # push stack
