@@ -48,6 +48,13 @@
     sll  %regOut, %regOut, 2        
 .end_macro
 
+.macro branch_on_key(%key_reg, %ascii_val, %target_label)
+    addi $t3, $zero, %ascii_val
+    beq  %key_reg, $t3, %target_label
+.end_macro
+
+
+
 # ====================================
 #       MAIN PROGRAM CONTROLLER
 # ====================================
@@ -462,36 +469,24 @@ WaitKey:
     lw   $t2, 4($t0)        
 
     # Movement controls
-    addi $t3, $zero, 119       # 'w'
-    beq  $t2, $t3, MoveUp
-    addi $t3, $zero, 115       # 's'
-    beq  $t2, $t3, MoveDown
-    addi $t3, $zero, 97        # 'a'
-    beq  $t2, $t3, MoveLeft
-    addi $t3, $zero, 100       # 'd'
-    beq  $t2, $t3, MoveRight
+    branch_on_key($t2, 119, MoveUp)      # 'w'
+    branch_on_key($t2, 115, MoveDown)    # 's'
+    branch_on_key($t2, 97,  MoveLeft)    # 'a'
+    branch_on_key($t2, 100, MoveRight)   # 'd'
     
     # Switch patterns while paused
-    addi $t3, $zero, 49        # '1'
-    beq  $t2, $t3, SetPat1
-    addi $t3, $zero, 50        # '2'
-    beq  $t2, $t3, SetPat2
-    addi $t3, $zero, 51        # '3'
-    beq  $t2, $t3, SetPat3
-    addi $t3, $zero, 52        # '4'
-    beq  $t2, $t3, SetPat4
+	branch_on_key($t2, 49, SetPat1) # '1'
+	branch_on_key($t2, 50, SetPat2) # '2'
+	branch_on_key($t2, 51, SetPat3) # '3'
+	branch_on_key($t2, 52, SetPat4) # '4'
     
     # Place or remove patterns
-    addi $t3, $zero, 122       # 'z' 
-    beq  $t2, $t3, ApplyZ      # draw pattern
-    addi $t3, $zero, 120       # 'x' 
-    beq  $t2, $t3, ApplyX      # delete pattern
+    branch_on_key($t2, 122, ApplyZ)         # 'z' - draw pattern
+    branch_on_key($t2, 120, ApplyX)         # 'x' - delete pattern
 
     # Global controls
-    addi $t3, $zero, 32         # 'space'
-    beq  $t2, $t3, EndGameInput # resume simulation
-    addi $t3, $zero, 114        # 'r'
-    beq  $t2, $t3, main        
+    branch_on_key($t2, 32, EndGameInput)    # 'space' - resume simulation
+    branch_on_key($t2, 114, main)           # 'r' - hard reset
     
     j    PauseLoop          
 
