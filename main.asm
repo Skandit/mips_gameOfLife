@@ -5,20 +5,14 @@
     displayBase: .word 0x10008000   
     aliveColor:  .word 0x00FFFFFF   # White
     deadColor:   .word 0x00000000   # Black
-    
-    # Starting cursor at Top-Left
-    cursorX:     .word 10           
+    cursorX:     .word 10           # Starting cursor at Top-Left
     cursorY:     .word 10           
-    
-    
     delayValue:      .word 0          # Current delay (0) normal mode is the fastest mod
     slowDelayAmt:    .word 1000000    # delayed so to speak slow mod
     selectedPattern: .word 1          # 1=Dot, 2=Glider, 3=Gun, 4=Spaceship
     hologramColor:   .word 0x00FF0000 # Red
 
-
     # Hardcoded arrays of memory offsets (relative to a starting pixel).
-
     # 36 Byte offsets to draw a -Gosper Glider Gun-
     gunOffsets:  .word 96, 344, 352, 560, 564, 592, 596, 648, 652, 812, 828, 848, 852, 904, 908, 1024, 1028, 1064, 1088, 1104, 1108, 1280, 1284, 1320, 1336, 1344, 1348, 1368, 1376, 1576, 1600, 1632, 1836, 1852, 2096, 2100
 
@@ -32,15 +26,11 @@
     .word 6280, 6284, 6288, 6536, 6544, 6792, 6796, 6800, 5788, 5792, 6040, 6296, 6300, 6304, 6552, 6808
     .word 7800, 8056, 8312, 8568, 8824, 8828, 8832, 7816, 7820, 7824, 8076, 8332, 8588, 8840, 8844, 8848, 7832, 7836, 7840, 8088, 8344, 8348, 8600, 8856, 7848, 7852, 7856, 8104, 8360, 8364, 8616, 8872, 8876, 8880
 
-    
-
 .text
 .globl main
-
 # =============================================================
 # MACRO: Calculates 1D memory offset to replicate 2D (X,Y) coordinates
 # Formula: Offset = ((Y * 64) + X) * 4
-# =============================================================
 
 .macro get_offset(%regY, %regX, %regOut)
     sll  %regOut, %regY, 6        
@@ -48,16 +38,36 @@
     sll  %regOut, %regOut, 2        
 .end_macro
 
+# MACRO: Conditionally branches to a label based on keyboard input and
+# If %key_reg == %ascii_val, jump to %target_label also overwrites $t3 
+
 .macro branch_on_key(%key_reg, %ascii_val, %target_label)
     addi $t3, $zero, %ascii_val
     beq  %key_reg, $t3, %target_label
 .end_macro
 
+# MACRO: Checks the MMIO keyboard status register for pending input and
+# sets %ready_reg to 1 if a key is pressed, 0 otherwise also overwrites $t0
 
+.macro poll_keyboard(%ready_reg)
+    lui  $t0, 0xFFFF           
+    lw   %ready_reg, 0($t0)           
+    andi %ready_reg, %ready_reg, 1 
+.end_macro
+
+.macro push(%reg)
+    addi $sp, $sp, -4
+    sw   %reg, 0($sp)
+.end_macro
+
+.macro pop(%reg)
+    lw   %reg, 0($sp)
+    addi $sp, $sp, 4
+.end_macro
 
 # ====================================
 #       MAIN PROGRAM CONTROLLER
-# ====================================
+
 main:
     jal ClearGrids              # will clear the current and next grids in memory
     jal DrawMenu                # will reender the orange background and title text
@@ -70,12 +80,9 @@ GameLoop:
     jal ApplyDelay              # will pause execution briefly if slow mode is active
     j   GameLoop                # Jump unconditionally back to the top of GameLoop
 
-
-
-
 # ============================================
 #       logic, rules by ENIS
-# ============================================
+
 ClearGrids:
     la   $t0, currentGrid   
     la   $t1, nextGrid      
@@ -160,10 +167,9 @@ DelayWait:                    # busy-wait loop
 EndDelay:
     jr   $ra
 
-
 # ============================================
 #       GRAPHICS & DRAWING SUBROUTINES
-# ============================================
+
 DrawMenu:
     lw   $t0, displayBase
     lw   $t1, menuColor
@@ -369,30 +375,20 @@ ApplyLWSSLoop:
 EndApplyLWSS:
     jr   $ra
 
-
 # ============================================
 #       menu, in game controls by MUSTAFA
-# ============================================
 
 MenuInput:
-    addi $sp, $sp, -4          # push stack
-    sw   $ra, 0($sp)
-
+    push($ra)         # push the return address to the stack
+    
 MenuLoop:
-    lui  $t0, 0xFFFF           # keyboard base address
-    lw   $t1, 0($t0)           # read status
-    andi $t1, $t1, 1           # check if key ready
+    poll_keyboard($t1)
     beq  $t1, $zero, MenuLoop  # wait until key is pressed
     
-    lw   $t2, 4($t0)           # get key value
-    addi $t3, $zero, 49        # '1'
-    beq  $t2, $t3, StartWithDot
-    addi $t3, $zero, 50        # '2'
-    beq  $t2, $t3, StartWithGlider
-    addi $t3, $zero, 51        # '3'
-    beq  $t2, $t3, StartWithGun
-    addi $t3, $zero, 52        # '4'
-    beq  $t2, $t3, StartWithLWSS
+    branch_on_key($t2, 49, StartWithDot)    # '1'
+    branch_on_key($t2, 50, StartWithGlider) # '2'
+    branch_on_key($t2, 51, StartWithGun)    # '3'
+    branch_on_key($t2, 52, StartWithLWSS)   # '4'
     j    MenuLoop              
         
 StartWithDot:
@@ -421,30 +417,23 @@ StartWithLWSS:
     j    EndMenu              
 
 EndMenu:
-    lw   $ra, 0($sp)           # pop stack
-    addi $sp, $sp, 4
+    pop($ra)           # pop the return address to the stack
+    
     jr   $ra                  
 
 GameInput:
-    addi $sp, $sp, -4          
-    sw   $ra, 0($sp)
+    push($ra)          # push the return address from the stack
 
-    lui  $t0, 0xFFFF           
-    lw   $t1, 0($t0)           
-    andi $t1, $t1, 1           # check if user pressed a button
+    poll_keyboard($t1)
     beq  $t1, $zero, EndGameInput   
 
     lw   $t2, 4($t0)           # get the key
     
-    addi $t3, $zero, 110       # 'n'
-    beq  $t2, $t3, SetSlow
-    addi $t3, $zero, 109       # 'm'
-    beq  $t2, $t3, SetNormal
-    
-    addi $t3, $zero, 114       # 'r'
-    beq  $t2, $t3, main        # hard reset game
+    branch_on_key($t2, 110, SetSlow)   # 'n'
+    branch_on_key($t2, 109, SetNormal) # 'm'
+    branch_on_key($t2, 114, main)      # 'r'
     addi $t3, $zero, 32        # 'space'
-    bne  $t2, $t3, EndGameInput     
+    bne  $t2, $t3, EndGameInput     # because of 'bne' couldnt apply branch_on_key here. :( 
 
     j    PauseLoop             # enter editing mode
 
@@ -461,9 +450,7 @@ PauseLoop:
     jal  DrawHologram          # show ghost of selected pattern
 
 WaitKey:
-    lui  $t0, 0xFFFF           
-    lw   $t1, 0($t0)           
-    andi $t1, $t1, 1           
+    poll_keyboard($t1)
     beq  $t1, $zero, WaitKey   # wait for edit command
 
     lw   $t2, 4($t0)        
@@ -548,6 +535,5 @@ ApplyX:
     j    PauseLoop
 
 EndGameInput:
-    lw   $ra, 0($sp)          
-    addi $sp, $sp, 4
+    pop($ra)           # pop the return address from the stack
     jr   $ra
