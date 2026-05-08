@@ -384,6 +384,7 @@ MenuInput:
 MenuLoop:
     poll_keyboard($t1)
     beq  $t1, $zero, MenuLoop  # wait until key is pressed
+    lw   $t2, 4($t0)
     
     branch_on_key($t2, 49, StartWithDot)    # '1'
     branch_on_key($t2, 50, StartWithGlider) # '2'
